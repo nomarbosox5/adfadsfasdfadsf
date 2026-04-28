@@ -513,13 +513,35 @@ async function doPoll() {
   try {
     const r = await pfetch(`https://statsapi.mlb.com/api/v1.1/game/${selectedGame.pk}/feed/live`);
     const d = await r.json();
+
+    // 1. Try current play first
     let wp = d?.liveData?.plays?.currentPlay?.about?.homeWinProbability ?? null;
-    if (wp===null) { const m=JSON.stringify(d).match(/"homeWinProbability"\s*:\s*([\d.]+)/); if(m) wp=parseFloat(m[1]); }
-    if (wp!==null) {
-      const homeWP = wp>1 ? wp : wp*100;
-      mlbWP = selectedGame.isHome ? homeWP : 100-homeWP;
+
+    // 2. Scan all plays for most recent non-null WP (handles between-inning gaps)
+    if (wp === null) {
+      const allPlays = d?.liveData?.plays?.allPlays || [];
+      for (let i = allPlays.length - 1; i >= 0; i--) {
+        const v = allPlays[i]?.about?.homeWinProbability;
+        if (v != null) { wp = v; break; }
+      }
     }
-    // update score
+
+    // 3. Regex fallback scan entire response
+    if (wp === null) {
+      const matches = [...JSON.stringify(d).matchAll(/"homeWinProbability"\s*:\s*([\d.]+)/g)];
+      if (matches.length) wp = parseFloat(matches[matches.length-1][1]);
+    }
+
+    if (wp !== null) {
+      const homeWP = wp > 1 ? wp : wp * 100;
+      // Only update if it's a real non-zero value
+      if (homeWP > 0 && homeWP < 100) {
+        mlbWP = selectedGame.isHome ? homeWP : 100 - homeWP;
+      }
+    }
+    // If still null — mlbWP keeps its last known value (sticky)
+
+    // Update score
     const ls = d?.liveData?.linescore;
     if (ls) {
       const aS = ls.teams?.away?.runs ?? 0;
@@ -579,7 +601,9 @@ function updateDisplay() {
   }
 
   if (mlbWP===null) {
-    setIdle('Win probability not in feed yet — game may be pregame.');
+    setIdle('Waiting for win probability — will populate once at-bat starts.');
+    document.getElementById('bar-mlb').style.width = '0%';
+    document.getElementById('bar-mlb-pct').textContent = '—';
     return;
   }
 
