@@ -332,6 +332,12 @@ body { font-family:var(--sans); background:var(--bg); color:var(--text); }
 const ODDS_KEY = '75fbd1947a7dec109b7573b6951a65aa';
 const POLL_MS  = 30000;
 const THRESH   = 8.0;
+const PROXY    = 'https://corsproxy.io/?url=';
+
+function pfetch(url) {
+  // Try direct first, fall back to proxy
+  return fetch(url).catch(() => fetch(PROXY + encodeURIComponent(url)));
+}
 
 const TEAMS = [
   {city:'Anaheim',       team:'Los Angeles Angels'},
@@ -378,7 +384,7 @@ let prog = 0;
 (async function boot() {
   try {
     const today = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'});
-    const r = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}`);
+    const r = await pfetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}`);
     const d = await r.json();
     const games = d?.dates?.[0]?.games || [];
 
@@ -505,7 +511,7 @@ async function doPoll() {
 
   // MLB win probability
   try {
-    const r = await fetch(`https://statsapi.mlb.com/api/v1.1/game/${selectedGame.pk}/feed/live`);
+    const r = await pfetch(`https://statsapi.mlb.com/api/v1.1/game/${selectedGame.pk}/feed/live`);
     const d = await r.json();
     let wp = d?.liveData?.plays?.currentPlay?.about?.homeWinProbability ?? null;
     if (wp===null) { const m=JSON.stringify(d).match(/"homeWinProbability"\s*:\s*([\d.]+)/); if(m) wp=parseFloat(m[1]); }
@@ -527,7 +533,7 @@ async function doPoll() {
 
   // Odds API — auto-fill
   try {
-    const r = await fetch(`https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h&bookmakers=draftkings,fanduel,betmgm`);
+    const r = await pfetch(`https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?apiKey=${ODDS_KEY}&regions=us&markets=h2h&bookmakers=draftkings,fanduel,betmgm`);
     const games = await r.json();
     const match = games.find(g => g.home_team===selectedGame.homeTeam || g.away_team===selectedGame.awayTeam);
     if (match) {
