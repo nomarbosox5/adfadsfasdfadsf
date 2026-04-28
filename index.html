@@ -1,24 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>MLB Live Arb Dashboard</title>
+    <meta charset="UTF-8">
+    <title>MLB Live Gumbo vs. HardRock Dashboard</title>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; }
-        .pane { width: 50%; height: 100vh; border: 2px solid #444; }
-        .header { background: #333; padding: 10px; text-align: center; font-weight: bold; }
-        iframe { width: 100%; height: 90%; border: none; }
-        .alert { position: fixed; top: 10px; right: 10px; background: red; padding: 20px; display: none; }
+        :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #38bdf8; --alert: #ef4444; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Left Side: MLB GUMBO FEED */
+        #gumbo-pane { width: 65%; border-right: 2px solid #334155; display: flex; flex-direction: column; padding: 20px; overflow-y: auto; }
+        .game-card { background: var(--card); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #475569; position: relative; }
+        .score-line { font-size: 24px; font-weight: bold; display: flex; justify-content: space-between; }
+        .win-prob { font-size: 18px; color: var(--accent); margin-top: 10px; }
+        .last-play { font-style: italic; color: #94a3b8; margin-top: 5px; font-size: 14px; }
+        
+        /* Right Side: ACTION PANE */
+        #bet-pane { width: 35%; display: flex; flex-direction: column; background: #000; }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        /* Alert System */
+        #alert-overlay { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--alert); padding: 15px 30px; border-radius: 50px; font-weight: bold; display: none; z-index: 100; animation: blink 0.5s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
-    <div class="pane">
-        <div class="header">FAST DATA (MLB GUMBO / STATCAST)</div>
-        <iframe src="https://www.mlb.com/scores"></iframe>
-    </div>
-    <div class="pane">
-        <div class="header">BETTING APP (HARD ROCK WEB)</div>
-        <iframe src="https://www.hardrock.bet/sportsbook/live"></iframe>
-    </div>
-    <div id="alertBox" class="alert">!! DATA DISCREPANCY DETECTED !!</div>
+
+<div id="alert-overlay">!! LARGE PROBABILITY SHIFT DETECTED !!</div>
+
+<div id="gumbo-pane">
+    <h2>LIVE GUMBO FEED (0s DELAY)</h2>
+    <div id="game-container">Loading live MLB games...</div>
+</div>
+
+<div id="bet-pane">
+    <div style="background:#222; padding:10px; text-align:center; font-size:12px;">HARD ROCK BET / SPORTSBOOK (SLOWER FEED)</div>
+    <iframe src="https://www.hardrock.bet/sportsbook/live/baseball"></iframe>
+</div>
+
+<script>
+    const API_URL = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&hydrate=team,linescore,flags,liveLookin";
+    let lastProbs = {};
+
+    async function fetchGames() {
+        try {
+            const response = await fetch(API_URL);
+            const data = await response.json();
+            const games = data.dates[0]?.games || [];
+            renderGames(games);
+        } catch (e) { console.error("API Error", e); }
+    }
+
+    function renderGames(games) {
+        const container = document.getElementById('game-container');
+        container.innerHTML = '';
+        
+        games.forEach(game => {
+            const gameId = game.gamePk;
+            const home = game.teams.home.team.name;
+            const away = game.teams.away.team.name;
+            const homeScore = game.linescore.teams.home.runs || 0;
+            const awayScore = game.linescore.teams.away.runs || 0;
+            const lastPlay = game.liveLookin?.lastPlay?.result?.description || "In progress...";
+            
+            // Logic: Detect if the score changed or a major play happened
+            const currentStatus = `${homeScore}-${awayScore}`;
+            if(lastProbs[gameId] && lastProbs[gameId] !== currentStatus) {
+                triggerAlert();
+            }
+            lastProbs[gameId] = currentStatus;
+
+            container.innerHTML += `
+                <div class="game-card">
+                    <div class="score-line">
+                        <span>${away} vs ${home}</span>
+                        <span>${awayScore} - ${homeScore}</span>
+                    </div>
+                    <div class="last-play">LATEST: ${lastPlay}</div>
+                    <div class="win-prob">Status: ${game.status.abstractGameState}</div>
+                </div>
+            `;
+        });
+    }
+
+    function triggerAlert() {
+        const alert = document.getElementById('alert-overlay');
+        alert.style.display = 'block';
+        setTimeout(() => alert.style.display = 'none', 3000);
+    }
+
+    // Refresh Gumbo every 2 seconds for max speed
+    setInterval(fetchGames, 2000);
+    fetchGames();
+</script>
+
 </body>
 </html>
