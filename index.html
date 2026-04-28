@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MLB Live Arb Dashboard</title>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; }
+        .pane { width: 50%; height: 100vh; border: 2px solid #444; }
+        .header { background: #333; padding: 10px; text-align: center; font-weight: bold; }
+        iframe { width: 100%; height: 90%; border: none; }
+        .alert { position: fixed; top: 10px; right: 10px; background: red; padding: 20px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="pane">
+        <div class="header">FAST DATA (MLB GUMBO / STATCAST)</div>
+        <iframe src="https://www.mlb.com/scores"></iframe>
+    </div>
+    <div class="pane">
+        <div class="header">BETTING APP (HARD ROCK WEB)</div>
+        <iframe src="https://www.hardrock.bet/sportsbook/live"></iframe>
+    </div>
+    <div id="alertBox" class="alert">!! DATA DISCREPANCY DETECTED !!</div>
+</body>
+</html>
