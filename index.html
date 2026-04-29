@@ -1,160 +1,119 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Gap King</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{
-  --bg:#f0f2f7;--surface:#fff;--border:#dde1ec;--text:#0f1120;--sub:#5a6180;--muted:#9096b0;--dim:#e8eaf4;
-  --green:#00a85a;--gl:#e6f7ef;--gb:#7dd4aa;
-  --red:#e8203a;--rl:#fef0f2;--rb:#f5aab5;
-  --amber:#d97706;--al:#fef7e8;--ab:#f5d588;
-  --blue:#2563eb;--sans:'Inter',sans-serif;--mono:'JetBrains Mono',monospace
-}
-html,body{height:100%;overflow:hidden}
-body{font-family:var(--sans);background:var(--bg);color:var(--text)}
-
-/* EXACT UI PRESERVATION */
-#app{height:100dvh;display:flex;flex-direction:column}
-.header{padding:16px 20px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.logo{font-weight:800;font-size:18px;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
-.logo span{background:var(--text);color:#fff;padding:2px 6px;border-radius:4px;font-size:12px}
-
-.main{flex:1;overflow-y:auto;padding:12px}
-.card{background:var(--surface);border-radius:16px;border:1px solid var(--border);margin-bottom:12px;padding:16px;box-shadow:0 2px 4px rgba(0,0,0,0.02)}
-.game-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-
-.btn{background:var(--blue);color:#fff;border:none;padding:12px;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;width:100%}
-.btn:active{transform:scale(0.98)}
-
-#active-watch{display:none;margin-top:4px}
-.stat-row{display:flex;justify-content:space-between;margin-bottom:8px}
-.stat-val{font-family:var(--mono);font-weight:700;font-size:20px}
-#signal{text-align:center;padding:15px;border-radius:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px}
-
-#log{font-family:var(--mono);font-size:10px;background:#000;color:#0f0;padding:10px;height:80px;overflow-y:auto;border-radius:8px;margin-top:10px}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gap King Pro</title>
+    <style>
+        :root { --bg: #f0f2f7; --card: #ffffff; --text: #0f1120; --blue: #2563eb; --red: #e8203a; --green: #00a85a; --border: #dde1ec; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 15px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
+        .card { background: var(--card); border-radius: 16px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .game-title { font-size: 18px; font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .stat-row { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+        .val { font-family: monospace; font-weight: bold; font-size: 16px; }
+        .signal { margin-top: 15px; padding: 12px; border-radius: 8px; text-align: center; font-weight: 800; text-transform: uppercase; }
+        .idle { background: #eee; color: #666; }
+        .buy { background: var(--red); color: white; animation: blink 1s infinite; }
+        .sell { background: var(--green); color: white; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        .profit-box { background: #f8fafc; border-radius: 8px; padding: 10px; margin-top: 10px; border: 1px dashed var(--border); }
+    </style>
 </head>
 <body>
 
-<div id="app">
     <div class="header">
-        <div class="logo">GAP KING <span>LIVE</span></div>
-        <div id="status" style="font-size:12px; font-weight:600; color:var(--muted)">READY</div>
+        <h1>Gap King Pro</h1>
+        <div id="clock" style="font-family: monospace;">POLLING LIVE...</div>
     </div>
 
-    <div class="main">
-        <div id="game-list" class="game-grid">
-            </div>
-
-        <div id="active-watch" class="card">
-            <h3 id="game-title" style="margin-bottom:15px">Monitoring...</h3>
-            <div class="stat-row">
-                <span>MLB LIVE (GUMBO)</span>
-                <span id="mlb-wp" class="stat-val">--%</span>
-            </div>
-            <div class="stat-row">
-                <span>BOOK IMPLIED</span>
-                <span id="book-wp" class="stat-val">--%</span>
-            </div>
-            <div id="signal" style="background:var(--dim); color:var(--muted)">CONNECTING DATA...</div>
+    <div id="main-grid" class="grid">
         </div>
 
-        <div id="log">SYSTEM INITIALIZED...</div>
-    </div>
-</div>
-
 <script>
+    const STAKE = 5.00;
+    const GAP_THRESHOLD = 8.0;
     const ODDS_API_KEY = '75fbd1947a7dec109b7573b6951a65aa';
     const PROXY = "https://corsproxy.io/?url=";
 
-    function logger(msg) {
-        const l = document.getElementById('log');
-        l.innerHTML += `> ${msg}<br>`;
-        l.scrollTop = l.scrollHeight;
+    function oddsToProb(odds) {
+        if (odds < 0) return (Math.abs(odds) / (Math.abs(odds) + 100)) * 100;
+        return (100 / (odds + 100)) * 100;
     }
 
-    async function fetchData(url) {
-        try {
-            const response = await fetch(PROXY + encodeURIComponent(url));
-            return await response.json();
-        } catch (e) {
-            logger("FETCH ERROR: " + e.message);
-            return null;
-        }
+    function calculateTrade(stake, buyOdds, truthProb) {
+        const buyProb = oddsToProb(buyOdds);
+        let potentialProfit = (buyOdds < 0) ? (stake / (Math.abs(buyOdds) / 100)) : (stake * (buyOdds / 100));
+        const gross = stake + potentialProfit;
+        const edgeValue = (truthProb - buyProb) / 100;
+        const predictedNet = gross * edgeValue;
+        return { gross, predictedNet };
     }
 
-    async function loadGames() {
-        logger("Fetching schedule...");
-        const data = await fetchData("https://statsapi.mlb.com/api/v1/schedule?sportId=1");
-        if (!data || !data.dates[0]) return;
-
-        const container = document.getElementById('game-list');
-        container.innerHTML = "";
+    async function updateDashboard() {
+        const grid = document.getElementById('main-grid');
         
-        data.dates[0].games.forEach(game => {
-            const div = document.createElement('div');
-            div.className = "card";
-            div.innerHTML = `
-                <div style="font-size:12px;font-weight:700;margin-bottom:8px">${game.teams.away.team.name} @ ${game.teams.home.team.name}</div>
-                <button class="btn" onclick="startTracking(${game.gamePk}, '${game.teams.home.team.name}')">SELECT</button>
+        // 1. Get Schedule & Live Probabilities
+        const mlbRes = await fetch(PROXY + encodeURIComponent("https://statsapi.mlb.com/api/v1/schedule?sportId=1&hydrate=liveLookin"));
+        const mlbData = await mlbRes.json();
+        const games = mlbData.dates[0]?.games || [];
+
+        // 2. Get Market Odds
+        const oddsRes = await fetch(PROXY + encodeURIComponent(`https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h`));
+        const oddsData = await oddsRes.json();
+
+        grid.innerHTML = "";
+
+        games.forEach(game => {
+            const homeTeam = game.teams.home.team.name;
+            const awayTeam = game.teams.away.team.name;
+            const truthProb = game.teams.home.homeWinProbability || 50.0;
+            
+            // Find Matching Odds
+            const marketGame = oddsData.find(g => g.home_team.includes(homeTeam) || homeTeam.includes(g.home_team));
+            const book = marketGame?.bookmakers.find(b => b.key === 'hardrock') || marketGame?.bookmakers[0];
+            const marketOdds = book?.markets[0].outcomes.find(o => o.name === marketGame.home_team)?.price || 1.91; // Decimal default
+            
+            // Convert Decimal to American for calculation if needed, but oddsToProb handles decimal in a way, 
+            // lets simplify: the API returns decimals.
+            const marketProb = (1 / marketOdds) * 100;
+            const gap = truthProb - marketProb;
+            const { gross, predictedNet } = calculateTrade(STAKE, (marketOdds > 2 ? (marketOdds-1)*100 : -100/(marketOdds-1)), truthProb);
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            
+            let signalClass = 'idle';
+            let signalText = 'Monitoring';
+            if (gap >= GAP_THRESHOLD) {
+                signalClass = 'buy';
+                signalText = `🚨 BUY SIGNAL: Bet ${homeTeam}`;
+            } else if (gap < 1.0 && truthProb > 80.0) {
+                signalClass = 'sell';
+                signalText = `✅ SELL SIGNAL: Cash Out`;
+            }
+
+            card.innerHTML = `
+                <div class="game-title">${awayTeam} @ ${homeTeam}</div>
+                <div class="stat-row"><span>MLB GUMBO (TRUTH)</span><span class="val">${truthProb.toFixed(1)}%</span></div>
+                <div class="stat-row"><span>MARKET (HARD ROCK)</span><span class="val">${marketProb.toFixed(1)}%</span></div>
+                <div class="stat-row"><span>CURRENT GAP</span><span class="val" style="color:${gap > 0 ? 'var(--green)' : 'var(--red)'}">${gap.toFixed(1)}%</span></div>
+                
+                <div class="profit-box">
+                    <div class="stat-row"><span>STAKE</span><span class="val">$${STAKE.toFixed(2)}</span></div>
+                    <div class="stat-row"><span>PREDICTED NET</span><span class="val" style="color:var(--green)">+$${predictedNet.toFixed(2)}</span></div>
+                </div>
+
+                <div class="signal ${signalClass}">${signalText}</div>
             `;
-            container.appendChild(div);
+            grid.appendChild(card);
         });
     }
 
-    async function startTracking(gamePk, homeTeam) {
-        document.getElementById('active-watch').style.display = "block";
-        document.getElementById('game-title').innerText = "TRACKING: " + homeTeam.toUpperCase();
-        logger(`Attached to ${homeTeam}`);
-
-        setInterval(async () => {
-            // 1. GET MLB WIN PROB
-            const mlb = await fetchData(`https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`);
-            const wp = mlb?.liveData?.plays?.currentPlay?.about?.homeWinProbability || 50;
-            document.getElementById('mlb-wp').innerText = wp + "%";
-
-            // 2. GET BOOK ODDS
-            // Fetching US region books specifically
-            const oddsData = await fetchData(`https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?apiKey=${ODDS_API_KEY}&regions=us&markets=h2h`);
-            
-            // Find the specific game in Odds API
-            const gameOdds = oddsData.find(g => g.home_team.includes(homeTeam) || homeTeam.includes(g.home_team));
-            
-            let impliedProb = 50; 
-            if (gameOdds) {
-                // Get Hard Rock if available, otherwise use average/first book
-                const book = gameOdds.bookmakers.find(b => b.key === 'hardrock') || gameOdds.bookmakers[0];
-                const homePrice = book.markets[0].outcomes.find(o => o.name === gameOdds.home_team).price;
-                
-                // Convert Decimal Odds to Implied Probability
-                impliedProb = (1 / homePrice) * 100;
-                document.getElementById('book-wp').innerText = impliedProb.toFixed(1) + "%";
-                logger(`Book Odds: ${homePrice} (${book.title})`);
-            } else {
-                document.getElementById('book-wp').innerText = "LIVE...";
-            }
-
-            // 3. CALC GAP
-            const gap = wp - impliedProb;
-            const sig = document.getElementById('signal');
-            if (gap > 6) {
-                sig.innerText = "🔥 BUY SIGNAL: +" + gap.toFixed(1) + "%";
-                sig.style.background = "var(--red)";
-                sig.style.color = "white";
-                logger("SIGNAL: HIGH EDGE DETECTED");
-            } else {
-                sig.innerText = "MONITORING GAP (" + gap.toFixed(1) + "%)";
-                sig.style.background = "var(--dim)";
-                sig.style.color = "var(--muted)";
-            }
-        }, 5000); // 5 second refresh
-    }
-
-    loadGames();
+    // Refresh every 10 seconds to stay under API limits but keep speed
+    setInterval(updateDashboard, 10000);
+    updateDashboard();
 </script>
 </body>
 </html>
